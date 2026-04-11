@@ -3,142 +3,106 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>新增客單系統</title>
+  <title>發送客單系統 (管理員專用)</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body { background-color: #f8f9fa; padding: 20px; }
-    .card { border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    body { background-color: #f0f2f5; padding: 20px; }
+    .card { border-radius: 12px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
   </style>
 </head>
 <body>
 
   <div class="container max-w-md mx-auto card p-4">
-    <h4 class="text-center mb-4">📝 新增客單</h4>
+    <h4 class="text-center mb-4">🚀 派發客單</h4>
     
-    <form id="orderForm">
+    <form id="dispatchForm">
       <div class="mb-3">
-        <label class="form-label">用途</label>
-        <input type="text" class="form-control" id="purpose" required placeholder="例如：找房人">
-      </div>
-      
-      <div class="mb-3">
-        <label class="form-label">客戶姓名</label>
-        <input type="text" class="form-control" id="customerName" required>
-      </div>
-      
-      <div class="mb-3">
-        <label class="form-label">金額</label>
-        <input type="number" class="form-control" id="amount" required placeholder="請輸入純數字">
-      </div>
-      
-      <div class="mb-3">
-        <label class="form-label">地區</label>
-        <select class="form-select" id="region" required>
-          <option value="" selected disabled>請選擇地區</option>
-          <option value="台北">台北</option>
-          <option value="桃園">桃園</option>
-          <option value="台中">台中</option>
-          <option value="高雄">高雄</option>
+        <label class="form-label">選擇發送對象 (借方)</label>
+        <select class="form-select" id="targetUser" required>
+          <option value="" selected disabled>載入名單中...</option>
         </select>
       </div>
+      
+      <hr>
 
       <div class="mb-3">
-        <label class="form-label">單別</label>
-        <select class="form-select" id="orderType" required>
-          <option value="" selected disabled>請選擇單別</option>
-          <option value="外部資訊">外部資訊 (扣30點)</option>
-          <option value="內部資訊">內部資訊 (扣120點)</option>
-        </select>
+        <label class="form-label text-danger">借客 LINE ID (需解鎖才可見)</label>
+        <input type="text" class="form-control" id="clientLineId" required>
       </div>
 
       <div class="mb-3">
-        <label class="form-label">電話</label>
-        <input type="tel" class="form-control" id="phone" required placeholder="例如：0912345678">
+        <label class="form-label text-danger">借客 電話號碼 (需解鎖才可見)</label>
+        <input type="tel" class="form-control" id="clientPhone" required>
       </div>
 
-      <button type="submit" class="btn btn-primary w-100 mt-3" id="submitBtn">送出資料</button>
+      <div class="mb-4">
+        <label class="form-label text-primary fw-bold">此單解鎖需扣除點數</label>
+        <input type="number" class="form-control form-control-lg" id="costPoints" required value="30">
+      </div>
+
+      <button type="submit" class="btn btn-dark w-100 py-2" id="submitBtn">發送未解鎖訊息給借方</button>
     </form>
   </div>
 
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  
   <script>
-    // 替換成你的 LIFF ID
-    const LIFF_ID = "https://liff.line.me/2008811649-QZq68T5c"; 
-    // 替換成你剛剛部署的 Apps Script Web App URL
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxC0R3W3oCXh0NFr5OUertcVIBMooDlX7PtOxyV8kC8X4ONiaYOaJvccBYiMlejgHoN/exec";
+    // 【重要】請替換成您部署出來的 Google Apps Script Web App URL
+    const GAS_URL = "您的_GAS_WEB_APP_URL_請填這";
 
-    let profileData = {};
-
-    // 初始化 LIFF
-    async function initializeLiff() {
+    // 網頁載入時，自動去 GAS 抓取 Users 工作表的借方名單
+    window.onload = async function() {
       try {
-        await liff.init({ liffId: LIFF_ID });
-        if (liff.isLoggedIn()) {
-          // 抓取使用者的 LINE ID 與 姓名
-          profileData = await liff.getProfile();
-        } else {
-          // 確保在外部瀏覽器也能要求登入
-          liff.login();
-        }
+        const response = await fetch(GAS_URL + "?action=getUsers");
+        const users = await response.json();
+        
+        const select = document.getElementById("targetUser");
+        select.innerHTML = '<option value="" selected disabled>請選擇對象</option>';
+        
+        users.forEach(user => {
+          const option = document.createElement("option");
+          option.value = user.userId;
+          option.textContent = user.userName;
+          select.appendChild(option);
+        });
       } catch (err) {
-        alert("LIFF 初始化失敗：" + err);
+        alert("名單載入失敗，請檢查 GAS 網址與權限。");
       }
-    }
+    };
 
-    initializeLiff();
-
-    // 處理表單送出
-    document.getElementById("orderForm").addEventListener("submit", async function(e) {
-      e.preventDefault(); // 防止網頁重整
+    // 表單送出處理
+    document.getElementById("dispatchForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
       
       const submitBtn = document.getElementById("submitBtn");
       submitBtn.disabled = true;
-      submitBtn.innerText = "資料傳送中...";
+      submitBtn.innerText = "發送中...";
 
-      // 收集表單資料
       const payload = {
-        userId: profileData.userId || "未授權",
-        userName: profileData.displayName || "未授權",
-        purpose: document.getElementById("purpose").value,
-        customerName: document.getElementById("customerName").value,
-        amount: document.getElementById("amount").value,
-        region: document.getElementById("region").value,
-        orderType: document.getElementById("orderType").value,
-        phone: document.getElementById("phone").value
+        action: "createLead",
+        targetUserId: document.getElementById("targetUser").value,
+        clientLineId: document.getElementById("clientLineId").value,
+        clientPhone: document.getElementById("clientPhone").value,
+        costPoints: document.getElementById("costPoints").value
       };
 
       try {
-        // 將資料 POST 到 Google Apps Script
         const response = await fetch(GAS_URL, {
           method: "POST",
-          body: JSON.stringify(payload),
-          headers: {
-            "Content-Type": "text/plain;charset=utf-8" // 避免 GAS CORS 問題，用 text/plain 傳送
-          }
+          body: JSON.stringify(payload)
         });
 
         const result = await response.json();
         
         if (result.status === "success") {
-          alert("資料建立成功！");
-          // 傳送一個訊息到聊天室，讓群組/機器人知道已送出
-          if (liff.isInClient()) {
-            await liff.sendMessages([{
-              type: "text",
-              text: `已透過系統建立一筆 ${payload.customerName} 的單據`
-            }]);
-            liff.closeWindow(); // 關閉 LIFF 視窗
-          }
+          alert("客單發送成功！借方已收到解鎖通知。");
+          document.getElementById("dispatchForm").reset(); // 清空表單
         } else {
-          alert("寫入失敗：" + result.message);
-          submitBtn.disabled = false;
-          submitBtn.innerText = "重新送出";
+          alert("發送發生錯誤：" + result.message);
         }
       } catch (error) {
-        alert("網路錯誤，請稍後再試：" + error);
+        alert("網路錯誤，請稍後再試。");
+      } finally {
         submitBtn.disabled = false;
-        submitBtn.innerText = "重新送出";
+        submitBtn.innerText = "發送未解鎖訊息給借方";
       }
     });
   </script>
