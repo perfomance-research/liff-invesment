@@ -10,7 +10,6 @@
     .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
     .form-label { font-weight: 600; color: #333; margin-bottom: 0.25rem; }
     .section-title { font-size: 1.1rem; color: #555; border-bottom: 2px solid #ddd; padding-bottom: 5px; margin-bottom: 15px; margin-top: 10px; }
-    /* 讓隱藏與顯示有平滑效果 */
     .fade-element { transition: opacity 0.3s ease-in-out; }
   </style>
 </head>
@@ -114,40 +113,52 @@
         </div>
       </div>
 
-      <button type="submit" class="btn btn-dark w-100 py-3 fw-bold" id="submitBtn">發送客單給借方</button>
+      <button type="submit" class="btn btn-primary w-100 py-3 fw-bold" id="submitBtn">發送客單給借方</button>
     </form>
   </div>
 
   <script>
     // ⚠️【非常重要】請替換成您最新部署出來的 GAS Web App URL
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbw7lw3q7IPwWGZ1OxkQzN2bh6PC1ACKr5TClrFFAOSsRFz3mduq3me2lNFWq4UYE6_O/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycby4x9PxFgaqEldxlSnRnGB6vxefnCWm5VaMqTsjCTGQYnSTxvrgbfy2ZX5eTcFOYvx6/exec";
 
-    // --- 功能 1：處理金額與扣點的「千分位逗號」 ---
-    document.querySelectorAll('.number-format').forEach(function(input) {
-      input.addEventListener('input', function(e) {
-        let rawValue = this.value.replace(/[^0-9]/g, ''); // 濾掉非數字
-        if (rawValue !== '') {
-          this.value = parseInt(rawValue, 10).toLocaleString('en-US');
-        } else {
-          this.value = '';
-        }
-      });
+    const amountInput = document.getElementById('amount');
+    const costPointsInput = document.getElementById('costPoints');
+
+    // --- 同步金額與扣點 ---
+    amountInput.addEventListener('input', function(e) {
+      let rawValue = this.value.replace(/[^0-9]/g, ''); 
+      if (rawValue !== '') {
+        let formatted = parseInt(rawValue, 10).toLocaleString('en-US');
+        this.value = formatted;
+        costPointsInput.value = formatted; // 讓點數自動等於金額
+      } else {
+        this.value = '';
+        costPointsInput.value = '';
+      }
     });
 
-    // --- 功能 2：單別選擇「其他」時跳出輸入框 ---
+    // 讓扣點也可以單獨修改
+    costPointsInput.addEventListener('input', function(e) {
+      let rawValue = this.value.replace(/[^0-9]/g, ''); 
+      if (rawValue !== '') {
+        this.value = parseInt(rawValue, 10).toLocaleString('en-US');
+      } else {
+        this.value = '';
+      }
+    });
+
     document.getElementById('orderType').addEventListener('change', function() {
       const otherInput = document.getElementById('otherSource');
       if (this.value === '其他') {
         otherInput.classList.remove('d-none');
-        otherInput.required = true; // 設為必填
+        otherInput.required = true; 
       } else {
         otherInput.classList.add('d-none');
         otherInput.required = false;
-        otherInput.value = ''; // 清空內容
+        otherInput.value = ''; 
       }
     });
 
-    // --- 載入名單 ---
     window.onload = async function() {
       try {
         const response = await fetch(GAS_URL + "?action=getUsers");
@@ -173,7 +184,6 @@
       }
     };
 
-    // --- 表單送出 ---
     document.getElementById("dispatchForm").addEventListener("submit", async function(e) {
       e.preventDefault();
       
@@ -181,13 +191,11 @@
       submitBtn.disabled = true;
       submitBtn.innerText = "發送中，請稍候...";
 
-      // 判斷單別 (如果是其他，就把輸入框的文字加上前綴送出)
       let finalOrderType = document.getElementById("orderType").value;
       if (finalOrderType === "其他") {
         finalOrderType = "其他: " + document.getElementById("otherSource").value;
       }
 
-      // ⚠️ 關鍵防呆：扣點傳給後端前，必須把逗號清掉，否則後端扣點計算(數學減法)會當機
       const rawCostPoints = document.getElementById("costPoints").value.replace(/,/g, '');
 
       const payload = {
@@ -195,13 +203,13 @@
         targetUserId: document.getElementById("targetUser").value,
         purpose: document.getElementById("purpose").value,
         customerName: document.getElementById("customerName").value,
-        amount: document.getElementById("amount").value, // 金額保留逗號，讓 Flex Message 好看
+        amount: document.getElementById("amount").value, 
         region: document.getElementById("region").value,
-        orderType: finalOrderType, // 使用判斷後的單別
-        limitCount: document.getElementById("limitCount").value, // 抓取下拉式選單的值
+        orderType: finalOrderType, 
+        limitCount: document.getElementById("limitCount").value, 
         clientLineId: document.getElementById("clientLineId").value,
         clientPhone: document.getElementById("clientPhone").value,
-        costPoints: rawCostPoints // 傳送乾淨的數字給後端
+        costPoints: rawCostPoints 
       };
 
       try {
@@ -216,7 +224,6 @@
         if (result.status === "success") {
           alert("客單發送成功！對方已收到解鎖通知。");
           document.getElementById("dispatchForm").reset(); 
-          // 表單重置後，把「其他」的輸入框藏起來
           document.getElementById('otherSource').classList.add('d-none');
         } else {
           alert("發送發生錯誤：" + result.message);
