@@ -10,6 +10,8 @@
     .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
     .form-label { font-weight: 600; color: #333; margin-bottom: 0.25rem; }
     .section-title { font-size: 1.1rem; color: #555; border-bottom: 2px solid #ddd; padding-bottom: 5px; margin-bottom: 15px; margin-top: 10px; }
+    /* 讓隱藏與顯示有平滑效果 */
+    .fade-element { transition: opacity 0.3s ease-in-out; }
   </style>
 </head>
 <body>
@@ -39,7 +41,7 @@
 
       <div class="mb-3">
         <label class="form-label">金額</label>
-        <input type="text" class="form-control" id="amount" required placeholder="輸入金額 (自動加上逗號)" inputmode="numeric">
+        <input type="text" class="form-control number-format" id="amount" required placeholder="輸入金額 (自動加逗號)" inputmode="numeric">
       </div>
 
       <div class="row g-2 mb-3">
@@ -77,8 +79,9 @@
             <option value="" disabled selected>請選擇單別</option>
             <option value="外部資訊">外部資訊</option>
             <option value="內部資訊">內部資訊</option>
-            <option value="其他: 來源">其他: 來源</option>
+            <option value="其他">其他: 來源</option>
           </select>
+          <input type="text" class="form-control mt-2 d-none fade-element" id="otherSource" placeholder="請輸入來源名稱">
         </div>
       </div>
 
@@ -96,11 +99,18 @@
       <div class="row g-2 mb-4">
         <div class="col-6">
           <label class="form-label text-primary">扣除點數</label>
-          <input type="number" class="form-control" id="costPoints" required value="30" min="0">
+          <input type="text" class="form-control number-format border-primary" id="costPoints" required placeholder="點數 (自動加逗號)" inputmode="numeric">
         </div>
         <div class="col-6">
           <label class="form-label text-primary">限制人數</label>
-          <input type="number" class="form-control" id="limitCount" required value="1" min="1">
+          <select class="form-select border-primary" id="limitCount" required>
+            <option value="無" selected>無</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
         </div>
       </div>
 
@@ -112,16 +122,28 @@
     // ⚠️【非常重要】請替換成您最新部署出來的 GAS Web App URL
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzuDN604ET3IVnX52rP5ESrWA0eziTxs_85Dnww8V6uxL9WxqrQ7c80X4ohuxqAE_HK/exec";
 
-    // --- 金額輸入防呆與千分位逗號處理 ---
-    const amountInput = document.getElementById('amount');
-    amountInput.addEventListener('input', function(e) {
-      // 1. 移除所有非數字的字元
-      let rawValue = this.value.replace(/[^0-9]/g, '');
-      // 2. 如果有數字，就加上逗號
-      if (rawValue !== '') {
-        this.value = parseInt(rawValue, 10).toLocaleString('en-US');
+    // --- 功能 1：處理金額與扣點的「千分位逗號」 ---
+    document.querySelectorAll('.number-format').forEach(function(input) {
+      input.addEventListener('input', function(e) {
+        let rawValue = this.value.replace(/[^0-9]/g, ''); // 濾掉非數字
+        if (rawValue !== '') {
+          this.value = parseInt(rawValue, 10).toLocaleString('en-US');
+        } else {
+          this.value = '';
+        }
+      });
+    });
+
+    // --- 功能 2：單別選擇「其他」時跳出輸入框 ---
+    document.getElementById('orderType').addEventListener('change', function() {
+      const otherInput = document.getElementById('otherSource');
+      if (this.value === '其他') {
+        otherInput.classList.remove('d-none');
+        otherInput.required = true; // 設為必填
       } else {
-        this.value = '';
+        otherInput.classList.add('d-none');
+        otherInput.required = false;
+        otherInput.value = ''; // 清空內容
       }
     });
 
@@ -159,18 +181,27 @@
       submitBtn.disabled = true;
       submitBtn.innerText = "發送中，請稍候...";
 
+      // 判斷單別 (如果是其他，就把輸入框的文字加上前綴送出)
+      let finalOrderType = document.getElementById("orderType").value;
+      if (finalOrderType === "其他") {
+        finalOrderType = "其他: " + document.getElementById("otherSource").value;
+      }
+
+      // ⚠️ 關鍵防呆：扣點傳給後端前，必須把逗號清掉，否則後端扣點計算(數學減法)會當機
+      const rawCostPoints = document.getElementById("costPoints").value.replace(/,/g, '');
+
       const payload = {
         action: "createLead",
         targetUserId: document.getElementById("targetUser").value,
         purpose: document.getElementById("purpose").value,
         customerName: document.getElementById("customerName").value,
-        amount: document.getElementById("amount").value, // 這裡會帶有逗號，可直接顯示
+        amount: document.getElementById("amount").value, // 金額保留逗號，讓 Flex Message 好看
         region: document.getElementById("region").value,
-        orderType: document.getElementById("orderType").value,
-        limitCount: document.getElementById("limitCount").value,
+        orderType: finalOrderType, // 使用判斷後的單別
+        limitCount: document.getElementById("limitCount").value, // 抓取下拉式選單的值
         clientLineId: document.getElementById("clientLineId").value,
         clientPhone: document.getElementById("clientPhone").value,
-        costPoints: document.getElementById("costPoints").value
+        costPoints: rawCostPoints // 傳送乾淨的數字給後端
       };
 
       try {
@@ -185,6 +216,8 @@
         if (result.status === "success") {
           alert("客單發送成功！對方已收到解鎖通知。");
           document.getElementById("dispatchForm").reset(); 
+          // 表單重置後，把「其他」的輸入框藏起來
+          document.getElementById('otherSource').classList.add('d-none');
         } else {
           alert("發送發生錯誤：" + result.message);
         }
