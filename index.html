@@ -17,7 +17,6 @@
 <body>
 
   <div class="container max-w-md mx-auto card p-4 mb-5">
-    
     <div class="mb-4">
       <label class="form-label text-primary fs-5">👤 請先選擇發送對象 (借方)</label>
       <select class="form-select form-select-lg border-primary" id="targetUser" required>
@@ -35,7 +34,6 @@
     </ul>
 
     <div class="tab-content" id="pills-tabContent">
-      
       <div class="tab-pane fade show active" id="content-lead" role="tabpanel">
         <form id="dispatchForm">
           <div class="section-title">📄 客單公開資訊</div>
@@ -51,7 +49,7 @@
               <label class="form-label">地區</label>
               <select class="form-select" id="region" required>
                 <option value="" disabled selected>請選擇地區</option>
-                <option value="台北市">台北市</option><option value="新北市">新北市</option><option value="桃園市">桃園市</option><option value="台中市">台中市</option><option value="台南市">台南市</option><option value="高雄市">高雄市</option><option value="其他縣市">其他縣市</option>
+                <option value="台北市">台北市</option><option value="新北市">新北市</option><option value="桃園市">桃園市</option><option value="台中市">台中市</option><option value="台南市">台南市</option><option value="高雄市">高雄市</option><option value="花蓮縣">花蓮縣</option><option value="其他縣市">其他縣市</option>
               </select>
             </div>
             <div class="col-6">
@@ -73,7 +71,7 @@
             <div class="col-6">
               <label class="form-label text-primary">限制人數</label>
               <select class="form-select border-primary" id="limitCount" required>
-                <option value="無" selected>無</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                <option value="無" selected>無</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
               </select>
             </div>
           </div>
@@ -98,9 +96,10 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // ⚠️【非常重要】請替換為您的 GAS Web App URL
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzYiE3tTKG85eyaXm-FSjBuLCDWvfsMGuVlsDZ4BNDBjKL4CTkzlgtO-vjmni6DJPKd/exec";
+    const GAS_URL = "
+https://script.google.com/macros/s/AKfycbyUyiwPDFokFAJ3fYnm8xmTYlGuQNFgw4hhPaCmzuls70OJXD8KO54WcIaRnTGAUMnB/exec";
 
-    // 格式化數字
+    // 格式化數字 (千分位逗號)
     document.querySelectorAll('.number-format').forEach(input => {
       input.addEventListener('input', function(e) {
         let raw = this.value.replace(/[^0-9]/g, '');
@@ -108,19 +107,17 @@
       });
     });
 
-    // 同步金額與扣點
+    // 💡 金額同步寫入扣點欄位
     document.getElementById('amount').addEventListener('input', function(e) {
       document.getElementById('costPoints').value = this.value;
     });
 
-    // 其他單別顯示
     document.getElementById('orderType').addEventListener('change', function() {
       const other = document.getElementById('otherSource');
       if (this.value === '其他') { other.classList.remove('d-none'); other.required = true; } 
       else { other.classList.add('d-none'); other.required = false; other.value = ''; }
     });
 
-    // 載入名單
     window.onload = async function() {
       try {
         const response = await fetch(GAS_URL + "?action=getUsers");
@@ -131,7 +128,6 @@
       } catch (err) { alert("名單載入失敗。"); }
     };
 
-    // 送出客單
     document.getElementById("dispatchForm").addEventListener("submit", async function(e) {
       e.preventDefault();
       const targetUserId = document.getElementById("targetUser").value;
@@ -147,26 +143,23 @@
         amount: document.getElementById("amount").value, region: document.getElementById("region").value,
         orderType: finalOrderType, limitCount: document.getElementById("limitCount").value,
         clientLineId: document.getElementById("clientLineId").value, clientPhone: document.getElementById("clientPhone").value,
-        costPoints: document.getElementById("costPoints").value.replace(/,/g, '')
+        costPoints: document.getElementById("costPoints").value.replace(/,/g, '') // 拔掉逗號送給後端
       };
 
       try {
         const res = await (await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload), headers: { "Content-Type": "text/plain" } })).json();
-        if (res.status === "success") { alert("✅ 客單發送成功！"); this.reset(); }
+        if (res.status === "success") { alert("✅ 客單發送成功！"); this.reset(); document.getElementById('otherSource').classList.add('d-none');}
         else alert("發送失敗：" + res.message);
       } catch(e) { alert("網路錯誤"); } finally { document.getElementById("submitLeadBtn").disabled = false; }
     });
 
-    // 送出點數變更
     document.getElementById("pointForm").addEventListener("submit", async function(e) {
       e.preventDefault();
       const targetUserId = document.getElementById("targetUser").value;
       if(!targetUserId) return alert("請先在最上方選擇要儲值的對象！");
 
       document.getElementById("submitPointBtn").disabled = true;
-      const payload = {
-        action: "updatePoints", targetUserId: targetUserId, pointDelta: document.getElementById("pointDelta").value
-      };
+      const payload = { action: "updatePoints", targetUserId: targetUserId, pointDelta: document.getElementById("pointDelta").value };
 
       try {
         const res = await (await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload), headers: { "Content-Type": "text/plain" } })).json();
