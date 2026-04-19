@@ -23,7 +23,12 @@
       <select class="form-select form-select-lg border-primary" id="targetUser" required>
         <option value="" selected disabled>正在從資料庫載入名單中...</option>
       </select>
-      <span id="memberBadge" class="badge bg-secondary mt-2 d-none"></span>
+      
+      <div class="mt-2 d-flex align-items-center flex-wrap gap-2">
+        <span id="memberBadge" class="badge bg-secondary d-none"></span>
+        <span id="memberDateHint" class="text-secondary small fw-bold d-none"></span>
+      </div>
+      
     </div>
 
     <ul class="nav nav-pills mb-3 nav-justified" id="pills-tab" role="tablist">
@@ -138,19 +143,15 @@
       });
     });
 
-    // 💡 確保日期精準判斷
     function isMonthlyMember(startStr, expiryStr) {
       if (!startStr || !expiryStr) return false;
       const today = new Date(); 
       today.setHours(0,0,0,0);
-      
       const start = new Date(startStr.replace(/-/g, '/')); 
       start.setHours(0,0,0,0);
-      
       const expiry = new Date(expiryStr.replace(/-/g, '/')); 
       expiry.setHours(23,59,59,999);
       
-      if(isNaN(start.getTime()) || isNaN(expiry.getTime())) return false;
       return (today >= start && today <= expiry);
     }
 
@@ -164,7 +165,6 @@
       return [year, month, day].join('-');
     }
 
-    // 💡 自動加一個月
     document.getElementById('startDate').addEventListener('change', function() {
       if (!this.value) return;
       const start = new Date(this.value.replace(/-/g, '/'));
@@ -175,11 +175,11 @@
       document.getElementById('expiryDate').value = [year, month, day].join('-');
     });
 
-    // 💡 選擇對象，帶入所有資料
     document.getElementById('targetUser').addEventListener('change', function() {
       const selectedId = this.value;
       const user = userList.find(u => u.userId === selectedId);
       const badge = document.getElementById('memberBadge');
+      const dateHint = document.getElementById('memberDateHint'); // 🌟 新增的日期提示
       const costInput = document.getElementById('costPoints');
       const amountInput = document.getElementById('amount');
       const pointSettingSection = document.getElementById('pointSettingSection');
@@ -187,19 +187,26 @@
       if(user) {
         document.getElementById('currentPointsDisplay').textContent = `(目前餘額：${Number(user.points).toLocaleString()} 點)`;
         
-        // 💡 無論是否過期，皆強制帶入資料庫現有日期
         const fmtStart = formatDateForInput(user.startDate);
         const fmtExpiry = formatDateForInput(user.expiryDate);
         document.getElementById('startDate').value = fmtStart;
         document.getElementById('expiryDate').value = fmtExpiry;
 
+        // 🌟 如果資料庫有日期，就顯示在旁邊的提示區塊
+        if (fmtStart && fmtExpiry) {
+          dateHint.textContent = `(月費紀錄：${fmtStart} ~ ${fmtExpiry})`;
+          dateHint.classList.remove('d-none');
+        } else {
+          dateHint.classList.add('d-none');
+        }
+
         if(isMonthlyMember(user.startDate, user.expiryDate)) {
-          // 👑 月費會員有效中
-          badge.textContent = `👑 月費會員有效中 (${fmtStart} ~ ${fmtExpiry})`;
-          badge.className = "badge bg-success mt-2";
+          // 👑 月費會員
+          badge.textContent = `👑 月費會員有效中`; // 文字縮短，因為旁邊已經有日期了
+          badge.className = "badge bg-success";
           badge.classList.remove('d-none');
           
-          pointSettingSection.classList.add('d-none'); // 隱藏扣點區塊
+          pointSettingSection.classList.add('d-none');
           costInput.required = false; 
 
           document.getElementById('typeMonthly').checked = true;
@@ -208,12 +215,12 @@
           document.getElementById('pointDelta').required = false;
 
         } else {
-          // 💰 點數會員 (或已過期)
+          // 💰 點數會員
           badge.textContent = `💰 點數會員 (餘額：${Number(user.points).toLocaleString()} 點)`;
-          badge.className = "badge bg-primary mt-2";
+          badge.className = "badge bg-primary";
           badge.classList.remove('d-none');
 
-          pointSettingSection.classList.remove('d-none'); // 顯示扣點區塊
+          pointSettingSection.classList.remove('d-none');
           costInput.required = true; 
           costInput.value = amountInput.value; 
 
@@ -294,6 +301,7 @@
           Swal.fire('成功', '客單已發送', 'success'); 
           this.reset();
           document.getElementById('memberBadge').classList.add('d-none');
+          document.getElementById('memberDateHint').classList.add('d-none');
           document.getElementById('pointSettingSection').classList.remove('d-none'); 
         }
         else Swal.fire('錯誤', res.message, 'error');
