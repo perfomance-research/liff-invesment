@@ -57,7 +57,7 @@
             <div class="col-6">
               <label class="form-label">單別</label>
               <select class="form-select" id="orderType" required>
-                <option value="" disabled selected>請選擇單別</option><option value="外部資訊">外部資訊</option><option value="內部資訊">內部資訊</option><option value="其他">其他</option>
+                <option value="" disabled selected>請選擇</option><option value="外部資訊">外部資訊</option><option value="內部資訊">內部資訊</option><option value="其他">其他</option>
               </select>
               <input type="text" class="form-control mt-2 d-none" id="otherSource" placeholder="來源名稱">
             </div>
@@ -67,16 +67,22 @@
           <div class="mb-3"><label class="form-label text-danger">LINE ID</label><input type="text" class="form-control border-danger" id="clientLineId" required placeholder="借客 ID"></div>
           <div class="mb-3"><label class="form-label text-danger">電話</label><input type="tel" class="form-control border-danger" id="clientPhone" required placeholder="純數字" oninput="this.value=this.value.replace(/[^0-9]/g, '');"></div>
 
-          <div class="section-title text-primary">⚙️ 系統扣點設定</div>
-          <div class="row g-2 mb-4">
-            <div class="col-6"><label class="form-label text-primary" id="costPointsLabel">扣除點數</label><input type="text" class="form-control number-format border-primary" id="costPoints" required inputmode="numeric"></div>
-            <div class="col-6">
-              <label class="form-label text-primary">限制人數</label>
-              <select class="form-select border-primary" id="limitCount" required>
-                <option value="無" selected>無</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
-              </select>
+          <div id="pointSettingSection">
+            <div class="section-title text-primary">⚙️ 系統扣點設定</div>
+            <div class="row g-2 mb-4">
+              <div class="col-6">
+                <label class="form-label text-primary">扣除點數</label>
+                <input type="text" class="form-control number-format border-primary" id="costPoints" required inputmode="numeric">
+              </div>
+              <div class="col-6">
+                <label class="form-label text-primary">限制人數</label>
+                <select class="form-select border-primary" id="limitCount" required>
+                  <option value="無" selected>無</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+                </select>
+              </div>
             </div>
           </div>
+
           <button type="submit" class="btn btn-primary w-100 py-3 fw-bold" id="submitLeadBtn">發送客單</button>
         </form>
       </div>
@@ -95,8 +101,8 @@
           <div id="blockPoints">
             <div class="alert alert-warning py-2"><small>切換為點數會員將會清除該用戶現有的月費資格。</small></div>
             <div class="mb-3">
-              <label class="form-label">增減數額 <span id="currentPointsDisplay" class="text-primary fw-bold"></span></label>
-              <input type="number" class="form-control form-control-lg border-primary" id="pointDelta" placeholder="例如: 1000 (扣除請填負值)">
+              <label class="form-label">增減數額 <span id="currentPointsDisplay" class="text-success fw-bold"></span></label>
+              <input type="number" class="form-control form-control-lg border-primary" id="pointDelta" placeholder="例如: 1000 (扣除填負值)">
             </div>
           </div>
 
@@ -122,19 +128,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwPrqWsYt1M44ehqJRPCgH7rfdX6QtReMWPnu7hm7DA17VTNOFbOxNyaLVbD0V1Iazh/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwJ_fngzzaowsA6_n4EcbFnp6zZKwjGiw6LHapmrFFcLaIJ7TybsDe2ghVRL8PCkqGc/exec";
     let userList = []; 
-
-    // 💡 幫助格式化日期，以符合 <input type="date"> 需要的 YYYY-MM-DD
-    function formatDateForInput(dateStr) {
-      if (!dateStr) return "";
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return "";
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    }
 
     document.querySelectorAll('.number-format').forEach(input => {
       input.addEventListener('input', function() {
@@ -143,64 +138,96 @@
       });
     });
 
+    // 💡 修正日期時區 Bug：強制替換 '-' 為 '/'，讓 JS 使用本地時區解析
     function isMonthlyMember(startStr, expiryStr) {
       if (!startStr || !expiryStr) return false;
-      const today = new Date(); today.setHours(0,0,0,0);
-      const start = new Date(startStr); const expiry = new Date(expiryStr);
+      const today = new Date(); 
+      today.setHours(0,0,0,0);
+      
+      const start = new Date(startStr.replace(/-/g, '/')); 
+      start.setHours(0,0,0,0);
+      
+      const expiry = new Date(expiryStr.replace(/-/g, '/')); 
+      expiry.setHours(23,59,59,999);
+      
       return (today >= start && today <= expiry);
     }
 
-    // 🌟 當選擇借方對象時：自動載入點數與日期資料！
+    function formatDateForInput(dateStr) {
+      if(!dateStr) return "";
+      let d = new Date(dateStr.replace(/-/g, '/'));
+      if(isNaN(d.getTime())) return "";
+      let month = '' + (d.getMonth() + 1), day = '' + d.getDate(), year = d.getFullYear();
+      if (month.length < 2) month = '0' + month;
+      if (day.length < 2) day = '0' + day;
+      return [year, month, day].join('-');
+    }
+
+    // 💡 點擊開始日期，自動將到期日 + 1 個月
+    document.getElementById('startDate').addEventListener('change', function() {
+      if (!this.value) return;
+      const start = new Date(this.value.replace(/-/g, '/'));
+      start.setMonth(start.getMonth() + 1); // 自動加一個月
+      let month = '' + (start.getMonth() + 1), day = '' + start.getDate(), year = start.getFullYear();
+      if (month.length < 2) month = '0' + month;
+      if (day.length < 2) day = '0' + day;
+      document.getElementById('expiryDate').value = [year, month, day].join('-');
+    });
+
     document.getElementById('targetUser').addEventListener('change', function() {
       const selectedId = this.value;
       const user = userList.find(u => u.userId === selectedId);
       const badge = document.getElementById('memberBadge');
       const costInput = document.getElementById('costPoints');
       const amountInput = document.getElementById('amount');
-      const costLabel = document.getElementById('costPointsLabel');
+      const pointSettingSection = document.getElementById('pointSettingSection');
 
-      if (user) {
-        // 1. 自動帶入目前點數與日期到「會員管理」分頁
-        document.getElementById('currentPointsDisplay').innerText = `(目前餘額：${parseInt(user.points).toLocaleString('en-US')})`;
-        document.getElementById('startDate').value = formatDateForInput(user.startDate);
-        document.getElementById('expiryDate').value = formatDateForInput(user.expiryDate);
+      if(user) {
+        document.getElementById('currentPointsDisplay').textContent = `(目前餘額：${Number(user.points).toLocaleString()} 點)`;
 
-        // 2. 判斷是否為有效月費會員
         if(isMonthlyMember(user.startDate, user.expiryDate)) {
-          badge.textContent = `👑 月費會員有效中 (${formatDateForInput(user.startDate)} ~ ${formatDateForInput(user.expiryDate)})`;
+          // 👑 月費會員：隱藏扣點區塊
+          badge.textContent = `👑 月費會員有效中 (${user.startDate} ~ ${user.expiryDate})`;
           badge.className = "badge bg-success mt-2";
-          costInput.value = "月費會員免扣點";
-          costInput.disabled = true; 
-          costLabel.innerHTML = '扣除點數 <span class="text-success">(此會員不扣點)</span>';
           badge.classList.remove('d-none');
-        } else {
-          badge.textContent = `💰 點數會員 (餘額：${parseInt(user.points).toLocaleString('en-US')})`;
-          badge.className = "badge bg-primary mt-2";
-          costInput.disabled = false; 
-          costInput.value = amountInput.value; 
-          costLabel.innerHTML = '扣除點數';
-          badge.classList.remove('d-none');
-        }
-      }
-    });
+          
+          pointSettingSection.classList.add('d-none'); // 隱藏整個區塊
+          costInput.required = false; // 取消必填
 
-    // 🌟 當設定「開始日期」時，自動幫「到期日期」加一個月
-    document.getElementById('startDate').addEventListener('change', function() {
-      if(this.value) {
-        let d = new Date(this.value);
-        d.setMonth(d.getMonth() + 1); // 加一個月
-        
-        let yyyy = d.getFullYear();
-        let mm = String(d.getMonth() + 1).padStart(2, '0');
-        let dd = String(d.getDate()).padStart(2, '0');
-        
-        document.getElementById('expiryDate').value = `${yyyy}-${mm}-${dd}`;
+          document.getElementById('typeMonthly').checked = true;
+          document.getElementById('blockPoints').classList.add('d-none');
+          document.getElementById('blockMonthly').classList.remove('d-none');
+          document.getElementById('startDate').value = formatDateForInput(user.startDate);
+          document.getElementById('expiryDate').value = formatDateForInput(user.expiryDate);
+          document.getElementById('pointDelta').required = false;
+
+        } else {
+          // 💰 點數會員：顯示扣點區塊
+          badge.textContent = `💰 點數會員 (餘額：${Number(user.points).toLocaleString()} 點)`;
+          badge.className = "badge bg-primary mt-2";
+          badge.classList.remove('d-none');
+
+          pointSettingSection.classList.remove('d-none'); // 顯示區塊
+          costInput.required = true; // 恢復必填
+          costInput.value = amountInput.value; 
+
+          document.getElementById('typePoint').checked = true;
+          document.getElementById('blockPoints').classList.remove('d-none');
+          document.getElementById('blockMonthly').classList.add('d-none');
+          document.getElementById('startDate').value = "";
+          document.getElementById('expiryDate').value = "";
+          document.getElementById('pointDelta').required = true;
+        }
       }
     });
 
     document.getElementById('amount').addEventListener('input', function() {
       const costInput = document.getElementById('costPoints');
-      if(!costInput.disabled) costInput.value = this.value;
+      const pointSettingSection = document.getElementById('pointSettingSection');
+      // 如果區塊沒被隱藏，就同步數字
+      if(!pointSettingSection.classList.contains('d-none')) {
+        costInput.value = this.value;
+      }
     });
 
     document.getElementById('orderType').addEventListener('change', function() {
@@ -245,15 +272,18 @@
       let finalOrderType = document.getElementById("orderType").value;
       if (finalOrderType === "其他") finalOrderType = "其他: " + document.getElementById("otherSource").value;
 
-      const isMonthly = document.getElementById('costPoints').disabled;
+      // 判斷是否為月費會員（若扣點區塊隱藏，即為月費會員）
+      const isMonthly = document.getElementById('pointSettingSection').classList.contains('d-none');
+      const limitCountVal = isMonthly ? "無" : document.getElementById("limitCount").value;
+      const costPointsVal = isMonthly ? 0 : document.getElementById("costPoints").value.replace(/,/g, '');
 
       const payload = {
         action: "createLead", targetUserId: targetUserId, isMonthly: isMonthly,
         purpose: document.getElementById("purpose").value, customerName: document.getElementById("customerName").value,
         amount: document.getElementById("amount").value, region: document.getElementById("region").value,
-        orderType: finalOrderType, limitCount: document.getElementById("limitCount").value,
+        orderType: finalOrderType, limitCount: limitCountVal,
         clientLineId: document.getElementById("clientLineId").value, clientPhone: document.getElementById("clientPhone").value,
-        costPoints: document.getElementById("costPoints").value.replace(/,/g, '')
+        costPoints: costPointsVal
       };
 
       try {
@@ -261,8 +291,8 @@
         if (res.status === "success") { 
           Swal.fire('成功', '客單已發送', 'success'); 
           this.reset();
-          document.getElementById('memberBadge').classList.add('d-none'); 
-          document.getElementById('costPoints').disabled = false; 
+          document.getElementById('memberBadge').classList.add('d-none');
+          document.getElementById('pointSettingSection').classList.remove('d-none'); // 恢復顯示
         }
         else Swal.fire('錯誤', res.message, 'error');
       } catch(e) { Swal.fire('網路錯誤', '', 'error'); }
@@ -284,14 +314,7 @@
       try {
         const res = await (await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) })).json();
         if (res.status === "success") { 
-          Swal.fire({
-            title: '成功',
-            text: '會員資料已更新！網頁即將重新整理以載入最新狀態。',
-            icon: 'success',
-            confirmButtonText: '好的'
-          }).then(() => {
-            window.location.reload(); // 更新完畢自動重整網頁，抓取最新資料
-          });
+          Swal.fire('成功', '會員資料已更新，請重新整理網頁載入最新狀態。', 'success').then(() => location.reload()); 
         }
         else Swal.fire('失敗', res.message, 'error');
       } catch(e) { Swal.fire('錯誤', '更新失敗', 'error'); }
