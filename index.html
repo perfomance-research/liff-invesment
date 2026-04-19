@@ -128,7 +128,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwJ_fngzzaowsA6_n4EcbFnp6zZKwjGiw6LHapmrFFcLaIJ7TybsDe2ghVRL8PCkqGc/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwyR9adzp1nnzoH_Z-C3vrYRohcHdBK3Npbh6a-sGST39CnA3vOobIeZzw8vQlTHMor/exec";
     let userList = []; 
 
     document.querySelectorAll('.number-format').forEach(input => {
@@ -138,7 +138,7 @@
       });
     });
 
-    // 💡 修正日期時區 Bug：強制替換 '-' 為 '/'，讓 JS 使用本地時區解析
+    // 💡 確保日期精準判斷
     function isMonthlyMember(startStr, expiryStr) {
       if (!startStr || !expiryStr) return false;
       const today = new Date(); 
@@ -150,30 +150,32 @@
       const expiry = new Date(expiryStr.replace(/-/g, '/')); 
       expiry.setHours(23,59,59,999);
       
+      if(isNaN(start.getTime()) || isNaN(expiry.getTime())) return false;
       return (today >= start && today <= expiry);
     }
 
     function formatDateForInput(dateStr) {
       if(!dateStr) return "";
       let d = new Date(dateStr.replace(/-/g, '/'));
-      if(isNaN(d.getTime())) return "";
+      if(isNaN(d.getTime())) return dateStr; 
       let month = '' + (d.getMonth() + 1), day = '' + d.getDate(), year = d.getFullYear();
       if (month.length < 2) month = '0' + month;
       if (day.length < 2) day = '0' + day;
       return [year, month, day].join('-');
     }
 
-    // 💡 點擊開始日期，自動將到期日 + 1 個月
+    // 💡 自動加一個月
     document.getElementById('startDate').addEventListener('change', function() {
       if (!this.value) return;
       const start = new Date(this.value.replace(/-/g, '/'));
-      start.setMonth(start.getMonth() + 1); // 自動加一個月
+      start.setMonth(start.getMonth() + 1); 
       let month = '' + (start.getMonth() + 1), day = '' + start.getDate(), year = start.getFullYear();
       if (month.length < 2) month = '0' + month;
       if (day.length < 2) day = '0' + day;
       document.getElementById('expiryDate').value = [year, month, day].join('-');
     });
 
+    // 💡 選擇對象，帶入所有資料
     document.getElementById('targetUser').addEventListener('change', function() {
       const selectedId = this.value;
       const user = userList.find(u => u.userId === selectedId);
@@ -184,38 +186,40 @@
 
       if(user) {
         document.getElementById('currentPointsDisplay').textContent = `(目前餘額：${Number(user.points).toLocaleString()} 點)`;
+        
+        // 💡 無論是否過期，皆強制帶入資料庫現有日期
+        const fmtStart = formatDateForInput(user.startDate);
+        const fmtExpiry = formatDateForInput(user.expiryDate);
+        document.getElementById('startDate').value = fmtStart;
+        document.getElementById('expiryDate').value = fmtExpiry;
 
         if(isMonthlyMember(user.startDate, user.expiryDate)) {
-          // 👑 月費會員：隱藏扣點區塊
-          badge.textContent = `👑 月費會員有效中 (${user.startDate} ~ ${user.expiryDate})`;
+          // 👑 月費會員有效中
+          badge.textContent = `👑 月費會員有效中 (${fmtStart} ~ ${fmtExpiry})`;
           badge.className = "badge bg-success mt-2";
           badge.classList.remove('d-none');
           
-          pointSettingSection.classList.add('d-none'); // 隱藏整個區塊
-          costInput.required = false; // 取消必填
+          pointSettingSection.classList.add('d-none'); // 隱藏扣點區塊
+          costInput.required = false; 
 
           document.getElementById('typeMonthly').checked = true;
           document.getElementById('blockPoints').classList.add('d-none');
           document.getElementById('blockMonthly').classList.remove('d-none');
-          document.getElementById('startDate').value = formatDateForInput(user.startDate);
-          document.getElementById('expiryDate').value = formatDateForInput(user.expiryDate);
           document.getElementById('pointDelta').required = false;
 
         } else {
-          // 💰 點數會員：顯示扣點區塊
+          // 💰 點數會員 (或已過期)
           badge.textContent = `💰 點數會員 (餘額：${Number(user.points).toLocaleString()} 點)`;
           badge.className = "badge bg-primary mt-2";
           badge.classList.remove('d-none');
 
-          pointSettingSection.classList.remove('d-none'); // 顯示區塊
-          costInput.required = true; // 恢復必填
+          pointSettingSection.classList.remove('d-none'); // 顯示扣點區塊
+          costInput.required = true; 
           costInput.value = amountInput.value; 
 
           document.getElementById('typePoint').checked = true;
           document.getElementById('blockPoints').classList.remove('d-none');
           document.getElementById('blockMonthly').classList.add('d-none');
-          document.getElementById('startDate').value = "";
-          document.getElementById('expiryDate').value = "";
           document.getElementById('pointDelta').required = true;
         }
       }
@@ -224,7 +228,6 @@
     document.getElementById('amount').addEventListener('input', function() {
       const costInput = document.getElementById('costPoints');
       const pointSettingSection = document.getElementById('pointSettingSection');
-      // 如果區塊沒被隱藏，就同步數字
       if(!pointSettingSection.classList.contains('d-none')) {
         costInput.value = this.value;
       }
@@ -272,7 +275,6 @@
       let finalOrderType = document.getElementById("orderType").value;
       if (finalOrderType === "其他") finalOrderType = "其他: " + document.getElementById("otherSource").value;
 
-      // 判斷是否為月費會員（若扣點區塊隱藏，即為月費會員）
       const isMonthly = document.getElementById('pointSettingSection').classList.contains('d-none');
       const limitCountVal = isMonthly ? "無" : document.getElementById("limitCount").value;
       const costPointsVal = isMonthly ? 0 : document.getElementById("costPoints").value.replace(/,/g, '');
@@ -292,7 +294,7 @@
           Swal.fire('成功', '客單已發送', 'success'); 
           this.reset();
           document.getElementById('memberBadge').classList.add('d-none');
-          document.getElementById('pointSettingSection').classList.remove('d-none'); // 恢復顯示
+          document.getElementById('pointSettingSection').classList.remove('d-none'); 
         }
         else Swal.fire('錯誤', res.message, 'error');
       } catch(e) { Swal.fire('網路錯誤', '', 'error'); }
