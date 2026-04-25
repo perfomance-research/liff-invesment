@@ -134,8 +134,8 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // ⚠️【非常重要設定區】
-    const LIFF_ID = "2008811649-QZq68T5c"; 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxwMaIIJeA3DznEK3Pi6lNcJbgyzdMxPqUf-4A6fjR6tF6wW3OQ_5uTlJi5XY1oAh-K/exec";
+    const LIFF_ID = "2009889002-DLzVo7l8"; 
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwQL3qHEuYsWuokquuyREmiGn3SzLZAkBmqk78794PIzKsbXN-xI1LGKOq_g1izXlYX/exec";
     
     let userList = []; 
     let operatorId = "";
@@ -153,7 +153,8 @@
         
         const select = document.getElementById("targetUser");
         select.innerHTML = '<option value="" selected disabled>請選擇發送對象</option>';
-        select.add(new Option("📢 【群發】給所有帶有「金主」標籤的會員", "all_investors"));
+        // 💡 選項文字改為：發送給所有會員
+        select.add(new Option("📢 【群發】給所有系統內會員", "all_users"));
         userList.forEach(u => select.add(new Option(`👤 ${u.userName}`, u.userId)));
 
         document.getElementById('loadingOverlay').style.display = 'none';
@@ -209,8 +210,9 @@
       const amountInput = document.getElementById('amount');
       const pointSettingSection = document.getElementById('pointSettingSection');
 
-      if (selectedId === "all_investors") {
-        badge.textContent = "📢 群發模式：將發送給所有金主標籤會員";
+      // 💡 判斷文字改為 all_users
+      if (selectedId === "all_users") {
+        badge.textContent = "📢 群發模式：將發送給所有系統會員";
         badge.className = "badge bg-danger mt-2 px-3 py-2";
         badge.classList.remove('d-none');
         dateHint.classList.add('d-none');
@@ -236,7 +238,6 @@
           dateHint.classList.remove('d-none');
         } else { dateHint.classList.add('d-none'); }
 
-        // 💡 修正點：不管身分是誰，都不隱藏扣點區塊，並允許輸入
         pointSettingSection.classList.remove('d-none');
         costInput.required = true;
         costInput.disabled = false;
@@ -267,7 +268,7 @@
 
     document.getElementById('amount').addEventListener('input', function() {
       const costInput = document.getElementById('costPoints');
-      costInput.value = this.value; // 直接同步
+      costInput.value = this.value; 
     });
 
     document.getElementById('orderType').addEventListener('change', function() {
@@ -302,7 +303,6 @@
       let finalOrderType = document.getElementById("orderType").value;
       if (finalOrderType === "其他") finalOrderType = "其他: " + document.getElementById("otherSource").value;
 
-      // 無論身分，一律送出輸入的扣點數字
       const costPointsVal = document.getElementById("costPoints").value.replace(/,/g, '');
 
       const payload = {
@@ -332,10 +332,9 @@
       e.preventDefault();
       const targetUserId = document.getElementById("targetUser").value;
       if(!targetUserId) return Swal.fire('提示', '請先選擇對象', 'warning');
-      if(targetUserId === "all_investors") return Swal.fire('提示', '會員管理無法使用群發選項', 'warning'); 
+      if(targetUserId === "all_users") return Swal.fire('提示', '會員管理無法使用群發選項', 'warning'); 
 
       const type = document.querySelector('input[name="memberType"]:checked').value;
-      
       const payload = { 
         action: "updateMember", operatorId: operatorId, targetUserId: targetUserId, updateType: type,
         pointDelta: document.getElementById("pointDelta").value || 0,
