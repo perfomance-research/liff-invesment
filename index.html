@@ -50,8 +50,8 @@
         <form id="dispatchForm">
           <div class="section-title">📄 客單公開資訊</div>
           <div class="row g-2 mb-3">
-            <div class="col-6"><label class="form-label">用途</label><input type="text" class="form-control" id="purpose" required placeholder="例: 找房人"></div>
-            <div class="col-6"><label class="form-label">姓名</label><input type="text" class="form-control" id="customerName" required placeholder="例: 董董"></div>
+            <div class="col-6"><label class="form-label">用途</label><input type="text" class="form-control" id="purpose" required placeholder="例: 買車"></div>
+            <div class="col-6"><label class="form-label">姓名</label><input type="text" class="form-control" id="customerName" required placeholder="例: 林小姐"></div>
           </div>
           <div class="mb-3"><label class="form-label">金額</label><input type="text" class="form-control number-format" id="amount" required placeholder="輸入金額" inputmode="numeric"></div>
 
@@ -85,7 +85,7 @@
             <small class="text-muted">此客單開放給多少人搶單？超過名額時點擊解鎖會被阻擋。</small>
           </div>
 
-          <div class="section-title text-danger">🔒 借客聯絡資料 (隱藏)</div>
+          <div class="section-title text-danger">🔒 借客聯絡資料</div>
           <div class="mb-3"><label class="form-label text-danger">LINE ID</label><input type="text" class="form-control border-danger" id="clientLineId" required placeholder="借客 ID"></div>
           <div class="mb-3"><label class="form-label text-danger">電話</label><input type="tel" class="form-control border-danger" id="clientPhone" required placeholder="純數字" oninput="this.value=this.value.replace(/[^0-9]/g, '');"></div>
 
@@ -135,7 +135,7 @@
   <script>
     // ⚠️【非常重要設定區】
     const LIFF_ID = "2009889002-DLzVo7l8"; 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwQL3qHEuYsWuokquuyREmiGn3SzLZAkBmqk78794PIzKsbXN-xI1LGKOq_g1izXlYX/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxcu6vH-cAFy1l9G1VffTOGQjrXHJY3ASuN8qqUVagJQQbaVirQmJ-R08y-JxCMgdjU/exec";
     
     let userList = []; 
     let operatorId = "";
@@ -147,13 +147,31 @@
         const profile = await liff.getProfile();
         operatorId = profile.userId;
 
-        document.getElementById("loadingText").innerText = "載入系統資料中...";
-        const response = await fetch(GAS_URL + "?action=getUsers");
-        userList = await response.json();
+        document.getElementById("loadingText").innerText = "驗證管理員權限中...";
+        
+        // 🌟 呼叫時帶上 operatorId，若非管理員，後端會直接回傳 status: "error"
+        const response = await fetch(GAS_URL + "?action=getUsers&operatorId=" + operatorId);
+        const result = await response.json();
+
+        // 🌟 檢查後端回傳的狀態：如果是錯誤，直接踢出！
+        if (result.status === "error") {
+          Swal.fire({
+            icon: 'error',
+            title: '權限不足',
+            text: '您不是系統管理員，無法進入系統。',
+            confirmButtonText: '關閉視窗',
+            allowOutsideClick: false
+          }).then(() => {
+            liff.closeWindow(); // 按下關閉後，直接關閉 LINE 視窗
+          });
+          return; // 終止後續程式碼
+        }
+
+        // 驗證通過，將名單寫入
+        userList = result.data;
         
         const select = document.getElementById("targetUser");
         select.innerHTML = '<option value="" selected disabled>請選擇發送對象</option>';
-        // 💡 選項文字改為：發送給所有會員
         select.add(new Option("📢 【群發】給所有系統內會員", "all_users"));
         userList.forEach(u => select.add(new Option(`👤 ${u.userName}`, u.userId)));
 
@@ -162,9 +180,11 @@
       } catch (err) {
         document.getElementById("loadingText").innerText = "系統載入失敗";
         document.getElementById("loadingText").classList.replace("text-primary", "text-danger");
-        Swal.fire({ icon: 'error', title: '載入失敗', text: '請確認 LIFF ID 設定正確' });
+        Swal.fire({ icon: 'error', title: '載入失敗', text: '請確認網路狀態或 LIFF ID 設定' });
       }
     }
+    
+    // 網頁載入完畢即刻開始驗證
     window.onload = initializeLiff;
 
     document.querySelectorAll('.number-format').forEach(input => {
@@ -210,7 +230,6 @@
       const amountInput = document.getElementById('amount');
       const pointSettingSection = document.getElementById('pointSettingSection');
 
-      // 💡 判斷文字改為 all_users
       if (selectedId === "all_users") {
         badge.textContent = "📢 群發模式：將發送給所有系統會員";
         badge.className = "badge bg-danger mt-2 px-3 py-2";
