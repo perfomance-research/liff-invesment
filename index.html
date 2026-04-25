@@ -50,8 +50,8 @@
         <form id="dispatchForm">
           <div class="section-title">📄 客單公開資訊</div>
           <div class="row g-2 mb-3">
-            <div class="col-6"><label class="form-label">用途</label><input type="text" class="form-control" id="purpose" required placeholder="例: 買車"></div>
-            <div class="col-6"><label class="form-label">姓名</label><input type="text" class="form-control" id="customerName" required placeholder="例: 林小姐"></div>
+            <div class="col-6"><label class="form-label">用途</label><input type="text" class="form-control" id="purpose" required placeholder="例: 找房人"></div>
+            <div class="col-6"><label class="form-label">姓名</label><input type="text" class="form-control" id="customerName" required placeholder="例: 董董"></div>
           </div>
           <div class="mb-3"><label class="form-label">金額</label><input type="text" class="form-control number-format" id="amount" required placeholder="輸入金額" inputmode="numeric"></div>
 
@@ -85,7 +85,7 @@
             <small class="text-muted">此客單開放給多少人搶單？超過名額時點擊解鎖會被阻擋。</small>
           </div>
 
-          <div class="section-title text-danger">🔒 借客聯絡資料</div>
+          <div class="section-title text-danger">🔒 借客聯絡資料 (隱藏)</div>
           <div class="mb-3"><label class="form-label text-danger">LINE ID</label><input type="text" class="form-control border-danger" id="clientLineId" required placeholder="借客 ID"></div>
           <div class="mb-3"><label class="form-label text-danger">電話</label><input type="tel" class="form-control border-danger" id="clientPhone" required placeholder="純數字" oninput="this.value=this.value.replace(/[^0-9]/g, '');"></div>
 
@@ -93,8 +93,8 @@
             <div class="section-title text-primary">⚙️ 系統扣點設定</div>
             <div class="mb-4">
               <label class="form-label text-primary">扣除點數</label>
-              <input type="text" class="form-control number-format border-primary form-control-lg fw-bold" id="costPoints" required inputmode="numeric">
-              <small class="text-muted">設定此客單的價值。點擊解鎖時，月費會員不扣點，點數會員將被扣除此點數。</small>
+              <input type="text" class="form-control number-format border-primary form-control-lg fw-bold" id="costPoints" required placeholder="請輸入點數" inputmode="numeric">
+              <small class="text-muted">點擊解鎖時，月費會員不扣點，點數會員將被扣除此點數。</small>
             </div>
           </div>
           <button type="submit" class="btn btn-primary w-100 py-3 fw-bold" id="submitLeadBtn">確認發送客單</button>
@@ -135,7 +135,7 @@
   <script>
     // ⚠️【非常重要設定區】
     const LIFF_ID = "2009889002-DLzVo7l8"; 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxcu6vH-cAFy1l9G1VffTOGQjrXHJY3ASuN8qqUVagJQQbaVirQmJ-R08y-JxCMgdjU/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyPfU8wTC2VQ2-vnyk1Yn8J2MqG2X3XKW06bzZepkg8rKDbBbwf7S65bkEtcGUqEfEO/exec";
     
     let userList = []; 
     let operatorId = "";
@@ -149,11 +149,9 @@
 
         document.getElementById("loadingText").innerText = "驗證管理員權限中...";
         
-        // 🌟 呼叫時帶上 operatorId，若非管理員，後端會直接回傳 status: "error"
         const response = await fetch(GAS_URL + "?action=getUsers&operatorId=" + operatorId);
         const result = await response.json();
 
-        // 🌟 檢查後端回傳的狀態：如果是錯誤，直接踢出！
         if (result.status === "error") {
           Swal.fire({
             icon: 'error',
@@ -161,15 +159,11 @@
             text: '您不是系統管理員，無法進入系統。',
             confirmButtonText: '關閉視窗',
             allowOutsideClick: false
-          }).then(() => {
-            liff.closeWindow(); // 按下關閉後，直接關閉 LINE 視窗
-          });
-          return; // 終止後續程式碼
+          }).then(() => { liff.closeWindow(); });
+          return;
         }
 
-        // 驗證通過，將名單寫入
         userList = result.data;
-        
         const select = document.getElementById("targetUser");
         select.innerHTML = '<option value="" selected disabled>請選擇發送對象</option>';
         select.add(new Option("📢 【群發】給所有系統內會員", "all_users"));
@@ -184,7 +178,6 @@
       }
     }
     
-    // 網頁載入完畢即刻開始驗證
     window.onload = initializeLiff;
 
     document.querySelectorAll('.number-format').forEach(input => {
@@ -227,7 +220,6 @@
       const badge = document.getElementById('memberBadge');
       const dateHint = document.getElementById('memberDateHint'); 
       const costInput = document.getElementById('costPoints');
-      const amountInput = document.getElementById('amount');
       const pointSettingSection = document.getElementById('pointSettingSection');
 
       if (selectedId === "all_users") {
@@ -239,7 +231,7 @@
         pointSettingSection.classList.remove('d-none');
         costInput.required = true;
         costInput.disabled = false;
-        costInput.value = amountInput.value;
+        costInput.value = ""; // 🌟 切換對象時，扣點清空
         return; 
       }
 
@@ -260,7 +252,7 @@
         pointSettingSection.classList.remove('d-none');
         costInput.required = true;
         costInput.disabled = false;
-        costInput.value = amountInput.value;
+        costInput.value = ""; // 🌟 切換對象時，扣點清空
 
         if(isMonthlyMember(user.startDate, user.expiryDate)) {
           badge.textContent = `👑 月費會員有效中`; 
@@ -283,11 +275,6 @@
           document.getElementById('pointDelta').required = true;
         }
       }
-    });
-
-    document.getElementById('amount').addEventListener('input', function() {
-      const costInput = document.getElementById('costPoints');
-      costInput.value = this.value; 
     });
 
     document.getElementById('orderType').addEventListener('change', function() {
@@ -316,19 +303,57 @@
 
     document.getElementById("dispatchForm").addEventListener("submit", async function(e) {
       e.preventDefault();
+      
       const targetUserId = document.getElementById("targetUser").value;
       if(!targetUserId) return Swal.fire('提示', '請先選擇對象', 'warning');
 
+      // 🌟 獲取所有的值，準備顯示在確認視窗中
+      const selectElement = document.getElementById("targetUser");
+      const targetName = selectElement.options[selectElement.selectedIndex].text;
+      
       let finalOrderType = document.getElementById("orderType").value;
       if (finalOrderType === "其他") finalOrderType = "其他: " + document.getElementById("otherSource").value;
 
+      const amountVal = document.getElementById("amount").value;
+      const limitCountVal = document.getElementById("limitCount").value;
       const costPointsVal = document.getElementById("costPoints").value.replace(/,/g, '');
 
+      // 🌟 建立精美的再次確認視窗 HTML
+      const confirmHtml = `
+        <div class="text-start" style="font-size: 1.05rem;">
+          <p class="mb-2"><b>👤 發送對象：</b><span class="text-primary fw-bold">${targetName}</span></p>
+          <p class="mb-2"><b>💰 客單金額：</b>${amountVal}</p>
+          <p class="mb-2"><b>🛑 限制人數：</b><span class="text-danger fw-bold">${limitCountVal}</span></p>
+          <p class="mb-2"><b>⚙️ 扣除點數：</b><span class="text-danger fw-bold">${document.getElementById("costPoints").value} 點</span></p>
+          <hr>
+          <p class="text-muted small mb-0">確認以上資訊無誤後，將立即發送卡片給對方。</p>
+        </div>
+      `;
+
+      // 🌟 呼叫 SweetAlert2 進行防呆確認
+      const confirmResult = await Swal.fire({
+        title: '確認發送客單？',
+        html: confirmHtml,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0d6efd',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '確定發送',
+        cancelButtonText: '取消',
+        reverseButtons: true
+      });
+
+      // 如果管理員按了取消，就中止後續動作
+      if (!confirmResult.isConfirmed) {
+        return; 
+      }
+
+      // 如果確認發送，才繼續執行原本的 API
       const payload = {
         action: "createLead", operatorId: operatorId, targetUserId: targetUserId,
         purpose: document.getElementById("purpose").value, customerName: document.getElementById("customerName").value,
-        amount: document.getElementById("amount").value, region: document.getElementById("region").value,
-        orderType: finalOrderType, limitCount: document.getElementById("limitCount").value, 
+        amount: amountVal, region: document.getElementById("region").value,
+        orderType: finalOrderType, limitCount: limitCountVal, 
         clientLineId: document.getElementById("clientLineId").value, clientPhone: document.getElementById("clientPhone").value,
         costPoints: costPointsVal
       };
